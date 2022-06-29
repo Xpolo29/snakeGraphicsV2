@@ -16,7 +16,8 @@ bool lost = false;
 int apHIndex;
 int X = 65; //anchor map
 int Y = 65; //anchor map
-const int FRAME_TIME = 1; //ms
+const int FRAME_TIME = 10; //ms
+const int FPS = 10; // FPS/FRAME TIME(s) => 200 FPS 
 bool init = true;
 int adjMap[N][4];
 int Map[N];
@@ -49,6 +50,15 @@ vect2 idToCoord(int p) {
     v.x = 10 * (p % MAP_LENGTH);
     v.y = 10 * (p / MAP_LENGTH);
     return v;
+}
+
+int count_numbers(int num) {
+    int count = 0;
+    while (num != 0) {
+        count++;
+        num /= 10;
+    }
+    return count;
 }
 
 //return new point
@@ -88,21 +98,24 @@ bool linked(int A, int B) {
 
 
 int getHIndex(int p) {
-    int x = sizeof(HMap) / sizeof(*HMap);
-    return std::distance(HMap, std::find(HMap, HMap + x, p));
+    //int x = sizeof(HMap) / sizeof(*HMap);
+    //return std::distance(HMap, std::find(HMap, HMap + x, p));
+    for (int i = 0; i < N; i++) {
+        if (HMap[i] == p) { return i; }
+    }
 }
 
 int dist(int A, int B) {
     int v1[2] = { A % 100,A / 100 };
     int v2[2] = { B % 100,B / 100 };
     int d = (v1[0] - v2[0]) ^ 2 + (v1[1] - v2[1]) ^ 2;
-    return d;
+return d;
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
+    _In_opt_ HINSTANCE hPrevInstance,
+    _In_ LPWSTR    lpCmdLine,
+    _In_ int       nCmdShow)
 {
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
@@ -113,7 +126,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     MyRegisterClass(hInstance);
 
     // Perform application initialization:
-    if (!InitInstance (hInstance, nCmdShow))
+    if (!InitInstance(hInstance, nCmdShow))
     {
         return FALSE;
     }
@@ -122,7 +135,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     MSG msg;
 
-    
+
     // Main message loop:
     while (GetMessage(&msg, nullptr, 0, 0))
     {
@@ -132,14 +145,20 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
             DispatchMessage(&msg);
         }
     }
-    return (int) msg.wParam;
+    return (int)msg.wParam;
 }
 
 int rdp(int ap = -1) {
-    int p = rand() % N;
+    
+    std::list<int> free;
+    for (int i = 0; i < N; i++) { free.push_back(i); }
+    for (int i = 0; i < score; i++) { free.remove(body[i]); }
+    free.remove(apple);
+    int p = rand() % free.size();
 
-    if ((contains(body, p,N) || p == ap)) { return rdp(ap); }
-    return p;
+    //while ((p == ap) || contains(body,p,score)) { p = rand() % N; }
+    //if ((contains(body, p, N) || p == ap)) { return rdp(ap); }
+    return readl(free,p);
 }
 
 ATOM MyRegisterClass(HINSTANCE hInstance)
@@ -148,24 +167,54 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 
     wcex.cbSize = sizeof(WNDCLASSEX);
 
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SNAKEGRAPHICSV2));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(7);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_SNAKEGRAPHICSV2);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+    wcex.style = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc = WndProc;
+    wcex.cbClsExtra = 0;
+    wcex.cbWndExtra = 0;
+    wcex.hInstance = hInstance;
+    wcex.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_SNAKEGRAPHICSV2));
+    wcex.hCursor = LoadCursor(nullptr, IDC_ARROW);
+    wcex.hbrBackground = (HBRUSH)(7);
+    wcex.lpszMenuName = MAKEINTRESOURCEW(IDC_SNAKEGRAPHICSV2);
+    wcex.lpszClassName = szWindowClass;
+    wcex.hIconSm = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
 
     return RegisterClassExW(&wcex);
 }
 
+int distp(int A, int B) {
+    int d;
+    int HA = getHIndex(A);
+    int HB = getHIndex(B);
+    
+    if (HA > HB) { d = HB + N - HA; }
+    else { d = HB - HA; }
+    return d;
+}
+
 wchar_t* convertCharArrayToLPCWSTR(const char* charArray)
 {
-    wchar_t* wString = new wchar_t[4096]; MultiByteToWideChar(CP_ACP, 0, charArray, -1, wString, 4096); return wString;
+    wchar_t* wString = new wchar_t[4096];
+    MultiByteToWideChar(CP_ACP, 0, charArray, -1, wString, 4096);
+
+    return wString;
+}
+
+bool roadFree(int index) {
+    std::set<int> bodyparts;
+    int tail = getHIndex(body[0]);
+    for (int i = 0; i < score; i++) {
+        bodyparts.insert(body[i]);
+    }
+
+    for (int i = 0; i < score; i++) {
+        int tp = HMap[index + i];
+        
+        if (bodyparts.count(tp)) { return false; }
+
+        if (index + i == tail) { if (i > 1) { return true; } }
+    }
+    return true;
 }
 
 void update(HWND hwnd,        // handle to window for timer messages
@@ -173,9 +222,14 @@ void update(HWND hwnd,        // handle to window for timer messages
     UINT idTimer,     // timer identifier
     DWORD dwTime)     // current system time  
 {
-    
+
     //Update
-    if (lost) { KillTimer(hwnd, 1); return; }
+    if (lost) {
+        for (int i = 0; i < FPS; i++) {
+            KillTimer(hwnd, i);
+        }
+        return; 
+    }
 
     if (init) {
         RECT map = { X - 6, Y - 6, X + 6 + 10 * MAP_LENGTH, Y + 6 + 10 * MAP_HEIGHT };
@@ -186,10 +240,38 @@ void update(HWND hwnd,        // handle to window for timer messages
     vect2 vtail = idToCoord(body[0]);
     if ((body[N - 1] == -1)) {
         int np = -1;
-        if (np == -1) { HIndex = (HIndex + 1) % N; np = HMap[HIndex]; }
+        int dista = distp(body[score - 1], apple);//curr distance between head and apple
+        
+
+        //quickest path
+        for (int d = 0; d < 4; d++) {
+            //foreach direction
+            int tp = getNP(body[score - 1], d);
+            //valid ?
+            if (inBorder(tp, body[score - 1], d) && (!contains(body, tp, score,1))) {
+                int tdist = distp(tp,apple);
+                int ti  = getHIndex(tp);
+                int HB = getHIndex(body[0]);
+                int HA = getHIndex(apple);
+
+                int taildist = (HB - HA)%N;
+
+                //new dist lower and enough space to fill entire body
+                if ((tdist < dista) && (roadFree(ti))){ // (taildist + 2 * tdist > score)) {
+                    dista = tdist;
+                    np = tp;
+                    HIndex = ti;
+                }
+            }
+        }
+
+        if (np == -1) { 
+            HIndex = (HIndex+1) % N;
+            np = HMap[HIndex]; 
+        }
 
         int d = getDir(body[score - 1], np);
-        if (!inBorder(np, body[score - 1], d) || (contains(body, np, 1))) {
+        if (!inBorder(np, body[score - 1], d) || (contains(body, np, score,1))) {
             std::cout << body[score - 1] << " " << d << " " << np << std::endl;
             std::cout << "Lost ! Score is " << score << std::endl;
             lost = true;
@@ -205,7 +287,8 @@ void update(HWND hwnd,        // handle to window for timer messages
             //std::cout << "Score is " << score << std::endl;
             
             body[score] = np;
-            apple = rdp();
+            apple = rdp(apple);
+            apHIndex = getHIndex(apple);
             score++;
 
             vap = idToCoord(apple);
@@ -243,12 +326,13 @@ void update(HWND hwnd,        // handle to window for timer messages
 
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
-    
+    srand(time(NULL));
     
    hInst = hInstance; // Store instance handle in our global variable
-
+   int winMaxX = 2 * X + 10 * MAP_LENGTH + 12;
+   int winMaxY = Y + 170 + 10 * MAP_HEIGHT;
    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_MINIMIZEBOX | WS_SYSMENU,
-      0, 0, 2*X + 10 * MAP_LENGTH+12, Y + 170 + 10 * MAP_HEIGHT, nullptr, nullptr, hInstance, nullptr);
+      0, 0, winMaxX, winMaxY, nullptr, nullptr, hInstance, nullptr);
 
 
    if (!hWnd)
@@ -256,7 +340,10 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
       return FALSE;
    }
 
-
+   SetWindowPos(hWnd,0,
+       GetSystemMetrics(SM_CXSCREEN)/2-winMaxX/2,
+       GetSystemMetrics(SM_CYSCREEN)/2-winMaxY/2,
+       0,0, SWP_NOSIZE);
    ShowWindow(hWnd, nCmdShow);
    UpdateWindow(hWnd);
 
@@ -277,20 +364,25 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
            }
        }
    }
-   HMapstruct temp = getHMap(true);
-   for (int i = 0; i < N; i++) {
-       HMap[i] = temp.map[i];
-   }
+   
 
    //Init pos
    apple = rdp();
    score = 1;
    body[0] = rdp(apple); //0 is tail and score-1 is head
+
+   HMapstruct temp = getHMap(true);
+   for (int i = 0; i < N; i++) {
+       HMap[i] = temp.map[i];
+   }
    HIndex = getHIndex(body[0]);
    apHIndex = getHIndex(apple);
    //snkae init end
-
-   SetTimer(hWnd, 1, FRAME_TIME, (TIMERPROC)update);
+   for (int i = 0; i < FPS; i++) {
+       
+       SetTimer(hWnd, i, FRAME_TIME, (TIMERPROC)update);
+       Sleep(1000 / FPS);
+   }
    return TRUE;
 }
 
@@ -320,6 +412,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         break;
     case WM_PAINT:
         {
+        
         PAINTSTRUCT ps;
         HDC hdc = BeginPaint(hWnd, &ps);
 
@@ -333,12 +426,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         HBRUSH pen2 = CreateSolidBrush(RGB(0, 0, 255));
         SelectObject(hdc, pen2);
         if (!lost) {
-            for (int i = 0; i < score; i++) {
-                if (body[i] == -1) { continue; }
-                vect2 v = idToCoord(body[i]);
-                RECT carre = { X + v.x,Y + v.y,X + v.x + 9,Y + v.y + 9 };
-                FillRect(hdc, &carre, pen2);
-            }
+            //for (int i = 0; i < score; i++) {
+            //    if (body[i] == -1) { continue; }
+            //    vect2 v = idToCoord(body[i]);
+            //   RECT carre = { X + v.x,Y + v.y,X + v.x + 9,Y + v.y + 9 };
+            //    FillRect(hdc, &carre, pen2);
+            //}
+            vect2 v = idToCoord(body[0]);
+            RECT carre = { X + v.x,Y + v.y,X + v.x + 9,Y + v.y + 9 };
+            FillRect(hdc, &carre, pen2);
+
+            v = idToCoord(body[score-1]);
+            carre = { X + v.x,Y + v.y,X + v.x + 9,Y + v.y + 9 };
+            FillRect(hdc, &carre, pen2);
+
         }
         else {
             for (int i = 0; i < N; i++) {
@@ -360,16 +461,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
 
         //debug
-        std::string tmp = std::to_string(score);
-        char const* num_char = tmp.c_str();
-        LPCWSTR text2 = L"Score = ";
-        LPCWSTR text = convertCharArrayToLPCWSTR(num_char);
-        std::wstring df = std::wstring(text2)+ std::wstring(text);
-        LPCWSTR fused = df.c_str(); 
+        std::wstring text = L"Score = "+ std::to_wstring(score);
+        LPCWSTR fused = text.c_str();
+        DrawText(hdc, fused, sizeof(fused)+count_numbers(score), &info, DT_LEFT);
+        
 
-        DrawText(hdc, fused, sizeof(text2)+sizeof(score), &info, DT_LEFT);
         EndPaint(hWnd, &ps);
-
         }
         break;
     case WM_DESTROY:

@@ -3,8 +3,8 @@
 #include <set>
 
 
-const int MAP_LENGTH = 100;
-const int MAP_HEIGHT = 100;
+const int MAP_LENGTH = 40; // <= 200 pair
+const int MAP_HEIGHT = 20; // <=100 pair
 const int HALF_LENGTH = MAP_LENGTH / 2;
 const int HALF_HEIGHT = MAP_HEIGHT / 2;
 const int N = MAP_HEIGHT * MAP_LENGTH;
@@ -273,7 +273,7 @@ std::list<point> hamiltonian_cycle(std::list<std::list<node>> nodesl, std::list<
 	//std::cout << points.size() << std::endl;
 
 
-	point curr = point{ 6,6 }; //INIT pos
+	point curr = point{ 0,0 }; //INIT pos
 	cycle.push_back(curr);
 	point dir = point{ 1,0 }; //INIT dir
 	//std::cout << "hamiltonian cycle while" << std::endl;
@@ -390,15 +390,3 @@ HMapstruct getHMap(bool generate) {
 	}
 	return map;
 }
-
-/*
-int main2() {
-	srand(time(NULL));
-	HMap HMap = getHMap(true);
-
-	//print map
-	//for (int i = 0; i < N; i++) {
-	//	std::cout << (HMap.map[i]) << " " << std::endl;
-	//}
-}
-*/
